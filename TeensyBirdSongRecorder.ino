@@ -36,7 +36,8 @@ byte byte1, byte2, byte3, byte4;
 
 String filename;
 
-#define DEBUG 1
+
+//#define DEBUG 1
 
 const int myInput = AUDIO_INPUT_LINEIN;
 
@@ -67,7 +68,12 @@ const long int RECORDING_MILLIS = 1000 * 60 *  RECORDING_MINUTES; // Time for ea
 elapsedMillis etime;
 
 void setup() {
+
+  delay(1000);
+
+#ifdef DEBUG
   Serial.begin(9600);
+#endif
   AudioMemory(60);
   audioShield.enable();
   audioShield.inputSelect(myInput);
@@ -79,7 +85,9 @@ void setup() {
   if (!(SD.begin(SDCARD_CS_PIN))) {
     // stop here, but print a message repetitively
     while (1) {
+#ifdef DEBUG
       Serial.println("Unable to access the SD card");
+#endif
       delay(500);
     }
   }
@@ -92,7 +100,6 @@ void setup() {
   // set the Time library to use Teensy 3.0's RTC to keep time
   setSyncProvider(getTeensy3Time);
 #ifdef DEBUG
-  while (!Serial);  // Wait for Arduino Serial Monitor to open
   delay(100);
   if (timeStatus() != timeSet) {
     Serial.println("Unable to sync with the RTC");
@@ -105,7 +112,7 @@ void setup() {
   Serial.println("Initialization done");
 #endif
 
-  flashLED(5, 250, 100);
+
 }
 
 
@@ -122,7 +129,6 @@ void loop() {
     stopRecording();
     mode = 0;
     etime = 0;
-    startRecording();
   }
 
   if (mode == 1) {
@@ -142,7 +148,6 @@ void startRecording() {
 #ifdef DEBUG
   Serial.print("Filename = ");
   Serial.println(filename.c_str());
-
 #endif
   frec = SD.open(filename.c_str(), FILE_WRITE);
   if (frec) {
@@ -182,7 +187,7 @@ void stopRecording() {
     writeOutHeader();
     frec.close();
   }
-  flashLED(5, 100, 250);
+
 }
 
 void writeOutHeader() { // update WAV header with final filesize/datasize
@@ -289,14 +294,4 @@ String getFileName() {
   return ret;
 }
 
-void flashLED( int numflash, int on_time, int off_time ) {
-  // Flash the builtin LED numflash times with on_time and off_time between each one
-  int i;
-  for ( i = 0; i < numflash; i++) {
-    digitalWrite(13, HIGH);
-    delay(on_time);
-    digitalWrite(13, LOW);
-    delay(off_time);
-  }
 
-}
