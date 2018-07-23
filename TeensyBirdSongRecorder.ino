@@ -36,6 +36,17 @@ byte byte1, byte2, byte3, byte4;
 
 String filename;
 
+int led_val = 0;
+int led_inc = 2;
+elapsedMillis led_timer;
+const int LED_UPDATE_PERIOD = 10; // Update LED 50x second
+
+
+
+void flashLED( int numflash, int on_time, int off_time );
+
+
+
 
 //#define DEBUG 1
 
@@ -65,11 +76,16 @@ const long int RECORDING_MILLIS = 1000 * 60 *  RECORDING_MINUTES; // Time for ea
 #define SDCARD_MOSI_PIN  11  // not actually used
 #define SDCARD_SCK_PIN   13  // not actually used
 
+#define LED_PIN A16
+
 elapsedMillis etime;
 
 void setup() {
 
   delay(1000);
+
+  pinMode(LED_PIN, OUTPUT);
+
 
 #ifdef DEBUG
   Serial.begin(9600);
@@ -79,6 +95,9 @@ void setup() {
   audioShield.inputSelect(myInput);
   audioShield.micGain(40);  //0-63
   audioShield.volume(0.5);  //0-1
+
+  flashLED(5, 500, 200 );
+  delay(500);
 
   SPI.setMOSI(SDCARD_MOSI_PIN);
   SPI.setSCK(SDCARD_SCK_PIN);
@@ -92,8 +111,8 @@ void setup() {
     }
   }
 
-
-
+  flashLED(5, 200, 500);
+  delay(500);
 #ifdef DEBUG
   Serial.println("SD Card Setup Complete");
 #endif
@@ -112,11 +131,33 @@ void setup() {
   Serial.println("Initialization done");
 #endif
 
-
+  delay(500);
+  flashLED(5, 500, 500);
 }
 
 
 void loop() {
+
+  if ( led_timer > LED_UPDATE_PERIOD ) {
+    led_val += led_inc;
+    if( led_val > 255 ) {
+      led_val = 255;
+      led_inc = -led_inc;
+    }
+
+    if( led_val < 0 ) {
+      led_val = 0;
+      led_inc = -led_inc;
+    }
+    analogWrite(LED_PIN, led_val );
+    led_timer = 0;
+    
+
+  }
+
+  analogWrite( LED_PIN, led_val );
+
+
   if ( mode == 0 ) {
     startRecording();
 #ifdef DEBUG
@@ -185,6 +226,7 @@ void stopRecording() {
       recByteSaved += 256;
     }
     writeOutHeader();
+    flashLED(5, 500, 500);
     frec.close();
   }
 
@@ -294,4 +336,14 @@ String getFileName() {
   return ret;
 }
 
+void flashLED( int numflash, int on_time, int off_time ) {
+  // Flash the builtin LED numflash times with on_time and off_time between each one
+  int i;
+  for ( i = 0; i < numflash; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(on_time);
+    digitalWrite(LED_PIN, LOW);
+    delay(off_time);
+  }
+}
 
