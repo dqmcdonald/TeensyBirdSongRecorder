@@ -7,12 +7,14 @@
 
   D. Q. McDonald
   July 2018
-*/
 
+  
+
+*/
 
 #include <SPI.h>
 #include <SD.h>
-#include <SD_t3.h>
+//#include <SD_t3.h>
 #include <SerialFlash.h>
 
 #include <Audio.h>
@@ -47,8 +49,8 @@ void flashLED( int numflash, int on_time, int off_time );
 
 
 
-
-//#define DEBUG 1
+// Uncomment following line for debugging output
+#define DEBUG 1
 
 const int myInput = AUDIO_INPUT_LINEIN;
 
@@ -63,13 +65,13 @@ AudioConnection          patchCord1(audioInput, 0, queue1, 0);
 AudioConnection          patchCord2(audioSD, 0, audioOutput, 0);
 AudioConnection          patchCord3(audioSD, 0, audioOutput, 1);
 
-AudioControlSGTL5000     audioShield;
+//AudioControlSGTL5000     audioShield;
 
 int mode = 0;  // 0=stopped, 1=recording
 File frec;
 elapsedMillis  msecs;
 
-const long int RECORDING_MINUTES = 30;   // Time for each file in minutes
+const long int RECORDING_MINUTES = 1;   // Time for each file in minutes
 const long int RECORDING_MILLIS = 1000 * 60 *  RECORDING_MINUTES; // Time for each file in milliseconds
 
 #define SDCARD_CS_PIN    BUILTIN_SDCARD
@@ -91,10 +93,10 @@ void setup() {
   Serial.begin(9600);
 #endif
   AudioMemory(60);
-  audioShield.enable();
-  audioShield.inputSelect(myInput);
-  audioShield.micGain(40);  //0-63
-  audioShield.volume(0.5);  //0-1
+  //audioShield.enable();
+  //audioShield.inputSelect(myInput);
+  //audioShield.micGain(40);  //0-63
+  //audioShield.volume(0.5);  //0-1
 
   flashLED(5, 500, 200 );
   delay(500);
