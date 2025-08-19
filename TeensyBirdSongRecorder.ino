@@ -41,7 +41,7 @@ String filename;
 int led_val = 0;
 int led_inc = 2;
 elapsedMillis led_timer;
-const int LED_UPDATE_PERIOD = 10;  // Update LED 50x second
+const int LED_UPDATE_PERIOD = 10;  // Update LED 10x second
 
 
 
@@ -54,16 +54,20 @@ void flashLED(int numflash, int on_time, int off_time);
 
 
 // Definitions of Audio Library objects
-const int myInput = AUDIO_INPUT_LINEIN;
+
 AudioPlaySdWav audioSD;
 AudioInputI2S audioInput;
 AudioOutputI2S audioOutput;
 AudioRecordQueue queue1;
+AudioAmplifier amp1;
+
+const float AMP_GAIN = 100.0;
 
 
 
 //record from mic to buffer:
-AudioConnection patchCord1(audioInput, 0, queue1, 0);
+AudioConnection patchCord4(audioInput, 0, amp1, 0);
+AudioConnection patchCord1(amp1, 0, queue1, 0);
 AudioConnection patchCord2(audioSD, 0, audioOutput, 0);
 AudioConnection patchCord3(audioSD, 0, audioOutput, 1);
 
@@ -80,8 +84,6 @@ File frec;
 const long int SUNRISE_OFFSET = 5;                                // Number of minutes less than a full day we will sleep for
 const long int RECORDING_MINUTES = 5;                             // Time for each file in minutes
 const long int RECORDING_MILLIS = 1000 * 60 * RECORDING_MINUTES;  // Time for each file in milliseconds
-
-const long int DAY_SLEEP_SECONDS = (60 * 60 * 24) - 240;  // 24 hours - 4 minutes in case sunrise is earlier
 
 #define SDCARD_CS_PIN BUILTIN_SDCARD
 #define SDCARD_MOSI_PIN 11  // not actually used
@@ -109,7 +111,7 @@ void setup() {
 #endif
 
   AudioMemory(60);
-  
+  amp1.gain(AMP_GAIN);
 
   SPI.setMOSI(SDCARD_MOSI_PIN);
   SPI.setSCK(SDCARD_SCK_PIN);
@@ -123,7 +125,7 @@ void setup() {
     }
   }
 
-  
+
 #ifdef DEBUG
   Serial.println("SD Card Setup Complete");
 #endif
@@ -204,6 +206,8 @@ void loop() {
     // Recording time has finished:
     stopRecording();
     mode = STOPPED;
+
+    digitalWrite(LED_PIN, 0);  // Turn off LED
 
     // Sleep for another nearly a day
     long int minutes = 60 - SUNRISE_OFFSET - RECORDING_MINUTES;
@@ -383,20 +387,25 @@ void printDigits(int digits) {
 }
 
 String getFileName() {
-  // Returns a filename based on the current date and time: MMDDHHMM
+  // Returns a filename based on the current date and time: YYYY_MM_DD_HH_MM
   String ret = "";
+  ret += String(year());
+  ret += "_";
   if (month() < 10) {
     ret += "0";
   }
   ret += String(month());
+  ret += "_";
   if (day() < 10) {
     ret += "0";
   }
   ret += String(day());
+  ret += "_";
   if (hour() < 10) {
     ret += "0";
   }
   ret += String(hour());
+  ret += "_";
   if (minute() < 10) {
     ret += "0";
   }

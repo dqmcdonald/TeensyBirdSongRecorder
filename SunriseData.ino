@@ -387,16 +387,17 @@ static const Sunrise_data_s sunrise_data[] = {
   { 12, 31, 4, 50 },
 };
 
-#define DAYS_PER_MONTH 31
+#define DAYS_PER_MONTH 31 // Every day has
 
-// This version checks the day, month and minute to see if it's +/- 1 of sunrise + offset. If so
+// This version checks the day, month and minute to see if it's +/- 1 min of sunrise + offset. If so
 bool checkForSunrise(int offset) {
+
 
 #ifdef DEBUG
   Serial.print("checkForSunrise: Enter with offset: ");
   Serial.println(offset);
 #endif
- 
+
   // Get current date and time
   int current_month = month();
   int current_day = day();
@@ -415,7 +416,7 @@ bool checkForSunrise(int offset) {
   Serial.println(current_minute);
   Serial.print("  checkForSunrise: current timestamp:");
   Serial.println(current_timestamp);
-  
+
 #endif
 
   //Compute the index into the list of sunrise times
