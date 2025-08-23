@@ -81,7 +81,7 @@ rec_modes mode = STOPPED;
 File frec;
 
 
-const long int SUNRISE_OFFSET = 5;                                // Number of minutes less than a full day we will sleep for
+const long int DAILY_SUNRISE_OFFSET = 5;                          // Number of minutes less than a full day we will sleep for
 const long int RECORDING_MINUTES = 5;                             // Time for each file in minutes
 const long int RECORDING_MILLIS = 1000 * 60 * RECORDING_MINUTES;  // Time for each file in milliseconds
 
@@ -91,7 +91,8 @@ const long int RECORDING_MILLIS = 1000 * 60 * RECORDING_MINUTES;  // Time for ea
 
 #define LED_PIN A16
 
-const int OFFSET = 0;  // Time +/- from sunrise data to begin recording
+// Start 45 minutes before sunrise
+const int OFFSET = -45;  // Time +/- from sunrise data to begin recording
 
 elapsedMillis etime;
 
@@ -210,7 +211,7 @@ void loop() {
     digitalWrite(LED_PIN, 0);  // Turn off LED
 
     // Sleep for another nearly a day
-    long int minutes = 60 - SUNRISE_OFFSET - RECORDING_MINUTES;
+    long int minutes = 60 - DAILY_SUNRISE_OFFSET - RECORDING_MINUTES;
 
 #ifdef DEBUG
     Serial.print("About to sleep for 23 hours and ");
