@@ -91,8 +91,8 @@ const long int RECORDING_MILLIS = 1000 * 60 * RECORDING_MINUTES;  // Time for ea
 
 #define LED_PIN A16
 
-// Start 45 minutes before sunrise
-const int OFFSET = -45;  // Time +/- from sunrise data to begin recording
+// Start 15 minutes before sunrise
+const int OFFSET = -15;  // Time +/- from sunrise data to begin recording
 
 elapsedMillis etime;
 
@@ -208,7 +208,7 @@ void loop() {
     stopRecording();
     mode = STOPPED;
 
-    digitalWrite(LED_PIN, 0);  // Turn off LED
+    digitalWrite(LED_PIN, LOW);  // Turn off LED
 
     // Sleep for another nearly a day
     long int minutes = 60 - DAILY_SUNRISE_OFFSET - RECORDING_MINUTES;
