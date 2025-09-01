@@ -10,6 +10,13 @@
 
 Updated July 2025 for direct MEMS microphone and not using AudioShield. Also recording at sunrise, noon and sunset.
 
+Uses the following non-standard libraries:
+
+ArduinoLog: https://github.com/thijse/Arduino-Log
+
+Snooze: https://github.com/duff2013/Snooze
+
+
 */
 
 #include <Snooze.h>
@@ -139,10 +146,13 @@ void setup() {
 
   if (logFile) {
     Log.begin(LOG_LEVEL_VERBOSE, &logFile, true);  // Initialize ArduinoLog with the file
+    //Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);  // Initialize ArduinoLog with the Serial
+
     Log.setPrefix(printPrefix);                    // set prefix similar to NLog
     Log.trace(F("\n\n\n******************************\n"));
     Log.setPrefix(printPrefix);  // Date and Time timestamp
     Log.trace(F("Logging started to SD card.\n"));
+    Serial.println("Logging started to log.txt");
   } else {
     Serial.println("Error opening log.txt");
   }
@@ -224,6 +234,8 @@ void loop() {
       Serial.print(sleep_minute);
       Serial.println(" minutes");
       Log.trace(F("About to sleep for %d hours and %d minutes\n"), sleep_hour, sleep_minute);
+      logFile.flush();
+      logFile.close();
 #endif
       digitalWrite(LED_PIN, LOW);
       delay(1000);
@@ -250,7 +262,8 @@ void loop() {
     Serial.print(sleep_minute);
     Serial.println(" minutes");
     Log.trace(F("About to sleep for %d hours and %d minutes\n"), sleep_hour, sleep_minute);
-
+    logFile.flush();
+    logFile.close();
 #endif
 
     delay(1000);

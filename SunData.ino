@@ -420,7 +420,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
   Serial.print("; sunset offset = ");
   Serial.print(sunset_offset);
   Serial.println(" )");
-  Log.trace(F("checkForEvent(sunrise_offset=%02d,sunset_offset=%02d\n"), sunrise_offset, sunset_offset);
+  Log.trace(F("checkForEvent(sunrise_offset=%d,sunset_offset=%d\n"), sunrise_offset, sunset_offset);
 #endif
 
 
@@ -440,7 +440,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
   Serial.println(current_hour);
   Serial.print("  checkNextEvent() current minute:");
   Serial.println(current_minute);
-  Log.trace(F("checkForEvent() month = %02d, day = %02d, hour = %02d, minute=%02d\n"), current_month,
+  Log.trace(F("checkForEvent() month = %d, day = %d, hour = %d, minute=%d\n"), current_month,
     current_day,current_hour, current_minute);
 #endif
 
@@ -464,7 +464,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
   Serial.println(sunrise.hour());
   Serial.print("  checkNextEvent() sunrise minute (with offset): ");
   Serial.println(sunrise.minute());
-  Log.trace(F("checkForEvent() sunrise(with offset): %02d:%02d\n"), sunrise.hour(), sunrise.minute());
+  Log.trace(F("checkForEvent() sunrise(with offset): %d:%d\n"), sunrise.hour(), sunrise.minute());
   
 #endif
 
@@ -474,7 +474,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
   Serial.println(noon.hour());
   Serial.print("  checkNextEvent() noon minute: ");
   Serial.println(sunrise.minute());
-  Log.trace(F("checkForEvent() noon: %02d:%02d\n"), noon.hour(), noon.minute());
+  Log.trace(F("checkForEvent() noon: %d:%d\n"), noon.hour(), noon.minute());
 #endif
 
 
@@ -486,7 +486,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
   Serial.println(sunset.hour());
   Serial.print("  checkNextEvent() sunset minute (with offset): ");
   Serial.println(sunset.minute());
-  Log.trace(F("checkForEvent() sunset(with offset): %02d:%02d\n"), sunset.hour(), sunset.minute());
+  Log.trace(F("checkForEvent() sunset(with offset): %d:%d\n"), sunset.hour(), sunset.minute());
 #endif
 
 
@@ -504,7 +504,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
   Serial.println(next_sunrise.hour());
   Serial.print("  checkNextEvent() next sunrise (with offset): ");
   Serial.println(next_sunrise.minute());
-  Log.trace(F("checkForEvent() next day sunrise (with offset): %02d:%02d\n"), next_sunrise.hour(), next_sunrise.minute());
+  Log.trace(F("checkForEvent() next day sunrise (with offset): %d:%d\n"), next_sunrise.hour(), next_sunrise.minute());
 #endif
 
 
