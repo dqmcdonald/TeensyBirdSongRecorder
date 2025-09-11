@@ -2,13 +2,20 @@
 /*
   A bird song recorder. Record environmental sounds via microphone attached to LineIn of Teensy Audio Shield
   Files are recorded in 5 minute periods, with a date stamp making up the name of the file.
-  Tested on Teensy 3.6 with Audio shield. MEMS mincrophone with separate Lithirm battery powersupply.
+  Tested on Teensy 3.6 with Audio shield. MEMS mincrophone with separate lithium battery powersupply.
   This is based strongly on the recorder example file associated with the Audio Shield Examples
 
   D. Q. McDonald
   July 2018
 
-Updated July 2025 for direct MEMS microphone and not using AudioShield
+Updated July 2025 for direct MEMS microphone and not using AudioShield. Also recording at sunrise, noon and sunset.
+
+Uses the following non-standard libraries:
+
+ArduinoLog: https://github.com/thijse/Arduino-Log
+
+Snooze: https://github.com/duff2013/Snooze
+
 
 */
 
@@ -20,7 +27,12 @@ Updated July 2025 for direct MEMS microphone and not using AudioShield
 #include <Wire.h>
 #include <TimeLib.h>
 #include <String.h>
+#include <ArduinoLog.h>
+#include "RecorderTime.h"
 
+
+// Uncomment following line for debugging output
+#define DEBUG 1
 
 //Variables used to write Wave file
 unsigned long ChunkSize = 0L;
@@ -44,13 +56,10 @@ elapsedMillis led_timer;
 const int LED_UPDATE_PERIOD = 10;  // Update LED 10x second
 
 
-
 void flashLED(int numflash, int on_time, int off_time);
 
-
-
-// Uncomment following line for debugging output
-#define DEBUG 1
+bool do_record;
+const char* file_prefix = "";
 
 
 // Definitions of Audio Library objects
@@ -79,7 +88,7 @@ enum rec_modes { STOPPED,
 rec_modes mode = STOPPED;
 
 File frec;
-
+File logFile;
 
 const long int DAILY_SUNRISE_OFFSET = 5;                          // Number of minutes less than a full day we will sleep for
 const long int RECORDING_MINUTES = 5;                             // Time for each file in minutes
@@ -91,8 +100,9 @@ const long int RECORDING_MILLIS = 1000 * 60 * RECORDING_MINUTES;  // Time for ea
 
 #define LED_PIN A16
 
-// Start 45 minutes before sunrise
-const int OFFSET = -45;  // Time +/- from sunrise data to begin recording
+// Start 15 minutes before sunrise
+const int SUNRISE_OFFSET = -15;  // Time +/- from sunrise data to begin recording
+const int SUNSET_OFFSET = 15;    // Time +/- from sunset data to begin recording
 
 elapsedMillis etime;
 
@@ -100,6 +110,11 @@ SnoozeAlarm alarm;
 SnoozeAudio audio;
 
 SnoozeBlock snooze_config(alarm, audio);
+
+
+// Times we will sleep for
+int sleep_hour = 0;
+int sleep_minute = 0;
 
 
 void setup() {
@@ -127,8 +142,24 @@ void setup() {
   }
 
 
+  logFile = SD.open("log.txt", FILE_WRITE);  // Open or create the log file
+
+  if (logFile) {
+    Log.begin(LOG_LEVEL_VERBOSE, &logFile, true);  // Initialize ArduinoLog with the file
+    //Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);  // Initialize ArduinoLog with the Serial
+
+    Log.setPrefix(printPrefix);                    // set prefix similar to NLog
+    Log.trace(F("\n\n\n******************************\n"));
+    Log.setPrefix(printPrefix);  // Date and Time timestamp
+    Log.trace(F("Logging started to SD card.\n"));
+    Serial.println("Logging started to log.txt");
+  } else {
+    Serial.println("Error opening log.txt");
+  }
+
 #ifdef DEBUG
   Serial.println("SD Card Setup Complete");
+  Log.trace(F("SD Card Setup Complete.\n"));
 #endif
 
 
@@ -146,6 +177,7 @@ void setup() {
   Serial.println("RTC setup complete, time and date follows");
   digitalClockDisplay();
   Serial.println("Initialization done\n");
+  Log.trace(F("Initialization done.\n"));
 #endif
 
 
@@ -183,22 +215,34 @@ void loop() {
 
 
     // Check if it's time to start recording:
-    if (checkForSunrise(OFFSET)) {
-      startRecording();
+    do_record = checkNextEvent(SUNRISE_OFFSET, SUNSET_OFFSET, &sleep_hour, &sleep_minute, &file_prefix);
+
+    if (do_record) {
+      startRecording(file_prefix);
 #ifdef DEBUG
       Serial.println("Started Recording");
+      Log.trace(F("Started recording.\n"));
 #endif
       etime = 0;
       mode = RECORDING;
     } else {
-      // Sleep for another minute and check again:
+      // Sleep for the time to the next event
 #ifdef DEBUG
-      Serial.println("About to sleep for 1 min");
-      delay(1000);
+      Serial.print("About to sleep for ");
+      Serial.print(sleep_hour);
+      Serial.print("hours and ");
+      Serial.print(sleep_minute);
+      Serial.println(" minutes");
+      Log.trace(F("About to sleep for %d hours and %d minutes\n"), sleep_hour, sleep_minute);
+      logFile.flush();
+      logFile.close();
 #endif
-      alarm.setRtcTimer(0, 1, 0);       // hour, min, sec
-      SIM_SCGC6 &= ~SIM_SCGC6_I2S;      // Turn off i2s otherwise it wakes immediately
-      Snooze.hibernate(snooze_config);  // return module that woke processor
+      digitalWrite(LED_PIN, LOW);
+      delay(1000);
+
+      alarm.setRtcTimer(sleep_hour, sleep_minute, 0);  // hour, min, sec
+      SIM_SCGC6 &= ~SIM_SCGC6_I2S;                     // Turn off i2s otherwise it wakes immediately
+      Snooze.hibernate(snooze_config);                 // return module that woke processor
       doReboot();
     }
   }
@@ -208,21 +252,24 @@ void loop() {
     stopRecording();
     mode = STOPPED;
 
-    digitalWrite(LED_PIN, 0);  // Turn off LED
+    digitalWrite(LED_PIN, LOW);  // Turn off LED
 
-    // Sleep for another nearly a day
-    long int minutes = 60 - DAILY_SUNRISE_OFFSET - RECORDING_MINUTES;
-
+    do_record = checkNextEvent(SUNRISE_OFFSET, SUNSET_OFFSET, &sleep_hour, &sleep_minute, &file_prefix);
 #ifdef DEBUG
-    Serial.print("About to sleep for 23 hours and ");
-    Serial.print(minutes);
-    Serial.print(" minutes");
-    delay(1000);
+    Serial.print("About to sleep for ");
+    Serial.print(sleep_hour);
+    Serial.print("hours and ");
+    Serial.print(sleep_minute);
+    Serial.println(" minutes");
+    Log.trace(F("About to sleep for %d hours and %d minutes\n"), sleep_hour, sleep_minute);
+    logFile.flush();
+    logFile.close();
 #endif
 
-    alarm.setRtcTimer(23, minutes, 0);  // hour, min, sec
-    SIM_SCGC6 &= ~SIM_SCGC6_I2S;        // Turn off i2s otherwise it wakes immediately
-    Snooze.hibernate(snooze_config);    // return module that woke processor
+    delay(1000);
+    alarm.setRtcTimer(sleep_hour, sleep_minute, 0);  // hour, min, sec
+    SIM_SCGC6 &= ~SIM_SCGC6_I2S;                     // Turn off i2s otherwise it wakes immediately
+    Snooze.hibernate(snooze_config);                 // return module that woke processor
     doReboot();
   }
 
@@ -235,17 +282,19 @@ void doReboot() {
   SCB_AIRCR = 0x05FA0004;
 }
 
-void startRecording() {
+void startRecording(const char* prefix) {
 #ifdef DEBUG
   Serial.println("startRecording");
+  Log.trace(F("startRecording()\n"));
 #endif
-  filename = getFileName();
+  filename = getFileName(prefix);
   if (SD.exists(filename.c_str())) {
     SD.remove(filename.c_str());
   }
 #ifdef DEBUG
   Serial.print("Filename = ");
   Serial.println(filename.c_str());
+  Log.trace(F("Filename = '%s'\n"), filename.c_str());
 #endif
   frec = SD.open(filename.c_str(), FILE_WRITE);
   if (frec) {
@@ -274,6 +323,7 @@ void continueRecording() {
 void stopRecording() {
 #ifdef DEBUG
   Serial.println("stopRecording");
+  Log.trace(F("stopRecording()"));
 #endif
   queue1.end();
   if (mode == RECORDING) {
@@ -387,9 +437,11 @@ void printDigits(int digits) {
   Serial.print(digits);
 }
 
-String getFileName() {
+String getFileName(const char* prefix) {
   // Returns a filename based on the current date and time: YYYY_MM_DD_HH_MM
   String ret = "";
+  ret += prefix;
+  ret += "_";
   ret += String(year());
   ret += "_";
   if (month() < 10) {
@@ -424,4 +476,16 @@ void flashLED(int numflash, int on_time, int off_time) {
     digitalWrite(LED_PIN, LOW);
     delay(off_time);
   }
+}
+
+void printPrefix(Print* _logOutput, int logLevel) {
+  printTimestamp(_logOutput);
+}
+
+void printTimestamp(Print* _logOutput) {
+
+  // Time as string
+  char timestamp[20];
+  sprintf(timestamp, "%04d-%02d-%02d %02d:%02d", year(), month(), day(), hour(), minute());
+  _logOutput->print(timestamp);
 }
