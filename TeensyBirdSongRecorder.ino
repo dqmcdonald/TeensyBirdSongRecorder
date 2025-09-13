@@ -19,7 +19,10 @@ Snooze: https://github.com/duff2013/Snooze
 
 */
 
+#ifndef __IMXRT1062__
 #include <Snooze.h>
+#endif
+
 #include <SPI.h>
 #include <SD.h>
 #include <SerialFlash.h>
@@ -55,6 +58,8 @@ int led_inc = 2;
 elapsedMillis led_timer;
 const int LED_UPDATE_PERIOD = 10;  // Update LED 10x second
 
+const int SEC_PER_HOUR = 60 * 60;
+const int SEC_PER_MINUTE = 60;
 
 void flashLED(int numflash, int on_time, int off_time);
 
@@ -106,10 +111,16 @@ const int SUNSET_OFFSET = 15;    // Time +/- from sunset data to begin recording
 
 elapsedMillis etime;
 
+
+#ifndef __IMXRT1062__
 SnoozeAlarm alarm;
 SnoozeAudio audio;
+#endif
 
+#ifndef __IMXRT1062__
 SnoozeBlock snooze_config(alarm, audio);
+#endif
+
 
 
 // Times we will sleep for
@@ -125,6 +136,16 @@ void setup() {
   Serial.begin(9600);
   Serial.print("\n");
 #endif
+
+  // set the Time library to use Teensy 3.0's RTC to keep time
+  setSyncProvider(getTeensy3Time);
+#ifdef DEBUG
+  delay(100);
+  if (timeStatus() != timeSet) {
+    Serial.println("Unable to sync with the RTC");
+  } else {
+    Serial.println("RTC has set the system time");
+  }
 
   AudioMemory(60);
   amp1.gain(AMP_GAIN);
@@ -148,7 +169,7 @@ void setup() {
     Log.begin(LOG_LEVEL_VERBOSE, &logFile, true);  // Initialize ArduinoLog with the file
     //Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);  // Initialize ArduinoLog with the Serial
 
-    Log.setPrefix(printPrefix);                    // set prefix similar to NLog
+    Log.setPrefix(printPrefix);  // set prefix similar to NLog
     Log.trace(F("\n\n\n******************************\n"));
     Log.setPrefix(printPrefix);  // Date and Time timestamp
     Log.trace(F("Logging started to SD card.\n"));
@@ -164,15 +185,7 @@ void setup() {
 
 
 
-  // set the Time library to use Teensy 3.0's RTC to keep time
-  setSyncProvider(getTeensy3Time);
-#ifdef DEBUG
-  delay(100);
-  if (timeStatus() != timeSet) {
-    Serial.println("Unable to sync with the RTC");
-  } else {
-    Serial.println("RTC has set the system time");
-  }
+
 
   Serial.println("RTC setup complete, time and date follows");
   digitalClockDisplay();
@@ -180,8 +193,9 @@ void setup() {
   Log.trace(F("Initialization done.\n"));
 #endif
 
-
+#ifndef __IMXRT1062__
   alarm.setRtcTimer(0, 1, 0);  // hour, min, sec
+#endif
 
   flashLED(3, 100, 50);
   delay(100);
@@ -240,9 +254,12 @@ void loop() {
       digitalWrite(LED_PIN, LOW);
       delay(1000);
 
+#ifndef __IMXRT1062__
       alarm.setRtcTimer(sleep_hour, sleep_minute, 0);  // hour, min, sec
       SIM_SCGC6 &= ~SIM_SCGC6_I2S;                     // Turn off i2s otherwise it wakes immediately
       Snooze.hibernate(snooze_config);                 // return module that woke processor
+#endif
+      setWakeupCallandSleep(sleep_hour * SEC_PER_HOUR + sleep_minute * SEC_PER_MINUTE);
       doReboot();
     }
   }
@@ -267,9 +284,8 @@ void loop() {
 #endif
 
     delay(1000);
-    alarm.setRtcTimer(sleep_hour, sleep_minute, 0);  // hour, min, sec
-    SIM_SCGC6 &= ~SIM_SCGC6_I2S;                     // Turn off i2s otherwise it wakes immediately
-    Snooze.hibernate(snooze_config);                 // return module that woke processor
+
+    setWakeupCallandSleep(sleep_hour * SEC_PER_HOUR + sleep_minute * SEC_PER_MINUTE);
     doReboot();
   }
 
@@ -489,3 +505,91 @@ void printTimestamp(Print* _logOutput) {
   sprintf(timestamp, "%04d-%02d-%02d %02d:%02d", year(), month(), day(), hour(), minute());
   _logOutput->print(timestamp);
 }
+
+#if defined(__IMXRT1062__)
+#define SNVS_LPCR_LPTA_EN_MASK (0x2U)  ///< mask to put MCU to hibernate
+
+// see also https://forum.pjrc.com/threads/58484-issue-to-reporogram-T4-0?highlight=hibernate
+/**
+   * @brief Set the Wakeup Call object
+   *
+   * @param nsec number of seconds to sleep
+   */
+void setWakeupCall(uint32_t nsec) {
+  uint32_t tmp = SNVS_LPCR;  // save control register
+
+  SNVS_LPSR |= 1;
+
+  // disable alarm
+  SNVS_LPCR &= ~SNVS_LPCR_LPTA_EN_MASK;
+  while (SNVS_LPCR & SNVS_LPCR_LPTA_EN_MASK)
+    ;
+
+  __disable_irq();
+
+  //get Time:
+  uint32_t lsb, msb;
+  do {
+    msb = SNVS_LPSRTCMR;
+    lsb = SNVS_LPSRTCLR;
+  } while ((SNVS_LPSRTCLR != lsb) | (SNVS_LPSRTCMR != msb));
+  uint32_t secs = (msb << 17) | (lsb >> 15);
+
+  //set alarm
+  secs += nsec;
+  SNVS_LPTAR = secs;
+  while (SNVS_LPTAR != secs)
+    ;
+
+  // restore control register and set alarm
+  SNVS_LPCR = tmp | SNVS_LPCR_LPTA_EN_MASK;
+  while (!(SNVS_LPCR & SNVS_LPCR_LPTA_EN_MASK))
+    ;
+
+  __enable_irq();
+}
+
+/**
+   * @brief Shut down Tessnsy
+   *
+   */
+void powerDown(void) {
+  SNVS_LPCR |= (1 << 6);  // turn off power
+  while (1) asm("wfi");
+}
+
+/**
+   * @brief Set the Wakeup Call and Sleep object
+   *
+   * @param nsec number of seconds to sleep
+   */
+void setWakeupCallandSleep(uint32_t nsec) {
+  setWakeupCall(nsec);
+  powerDown();
+}
+
+#else
+
+void setWakeupCallandSleep(uint32_t nsec) {
+  uint16_t h;
+  int16_t m;
+  int16_t s;
+  secondsToHMS(nsec, h, m, s);
+
+  alarm.setRtcTimer(h, m, s);       // hour, min, sec
+  SIM_SCGC6 &= ~SIM_SCGC6_I2S;      // Turn off i2s otherwise it wakes immediately
+  Snooze.hibernate(snooze_config);  // return module that woke processor
+}
+
+void secondsToHMS(const uint32_t seconds, uint16_t& h, uint8_t& m, uint8_t& s) {
+  uint32_t t = seconds;
+
+  s = t % 60;
+
+  t = (t - s) / 60;
+  m = t % 60;
+
+  t = (t - m) / 60;
+  h = t;
+}
+#endif
