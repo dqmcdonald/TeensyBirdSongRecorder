@@ -67,7 +67,7 @@ bool RecorderTime::sleepOrRecord(const RecorderTime& target, int* sleep_hour, in
     hour_diff = 24 - d_hour + target.hour();
   }
 #if DEBUG
-  Serial.print("sleepOrRecord(): hour diff = ");
+  Serial.print("      sleepOrRecord(): hour diff = ");
   Serial.println(hour_diff);
 #endif
 
@@ -79,7 +79,7 @@ bool RecorderTime::sleepOrRecord(const RecorderTime& target, int* sleep_hour, in
   }
 
 #if DEBUG
-  Serial.print("sleepOrRecord(): minute diff = ");
+  Serial.print("      sleepOrRecord(): minute diff = ");
   Serial.println(minute_diff);
 #endif
 
@@ -87,7 +87,7 @@ bool RecorderTime::sleepOrRecord(const RecorderTime& target, int* sleep_hour, in
   if (hour_diff == 0 && minute_diff <= 1) {
     do_record = true;
 #if DEBUG
-    Serial.println("sleepOrRecord(): close to event, recording");
+    Serial.println("      sleepOrRecord(): close to event, recording");
     
 #endif
   } else {
@@ -95,7 +95,7 @@ bool RecorderTime::sleepOrRecord(const RecorderTime& target, int* sleep_hour, in
     *sleep_minute = minute_diff;
     do_record = false;
    #if DEBUG
-    Serial.println("sleepOrRecord(): sleeping");
+    Serial.println("      sleepOrRecord(): sleeping");
     
 #endif
   }
