@@ -524,20 +524,20 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
     Serial.println(end);
     Log.trace(F("checkForEvent() start, end minutes: %d:%d\n"), start, end);
 #endif
+    int day_length = end - start;
 
-    int random_minutes = random(start, end);
-    uint16_t  h, m, s;
+    int random_minutes = random(MINUTES_AFTER_SUNRISE, day_length);
+    uint16_t h, m, s;
 
     secondsToHMS(random_minutes * SEC_PER_MINUTE, h, m, s);
 
 #ifdef DEBUG
     Serial.print("  checkNextEvent() random_minutes ");
     Serial.println(random_minutes);
-
-    Log.trace(F("checkForEvent() random_minutes %d\n"),random_minutes);
+    Log.trace(F("checkForEvent() random_minutes %d\n"), random_minutes);
 #endif
 
-    secondsToHMS(random_minutes * SEC_PER_MINUTE, h, m, s); // Convert back to hours and minutes
+    secondsToHMS(random_minutes * SEC_PER_MINUTE, h, m, s);  // Convert back to hours and minutes
 
     *prefix = SUNSET_PREFIX;
     *sleep_hour = h;
