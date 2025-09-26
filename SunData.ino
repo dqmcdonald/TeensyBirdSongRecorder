@@ -585,7 +585,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
     if (current_time.before(sunrise)) {
 #ifdef DEBUG
       Serial.println("checkNextEvent() before sunrise");
-      Log.trace(F("checkForEvent() before sunrise"));
+      Log.trace(F("checkForEvent() before sunrise\n"));
 
 #endif
       *prefix = SUNRISE_PREFIX;
@@ -596,7 +596,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
 
 #ifdef DEBUG
       Serial.println("checkNextEvent() before sunset ");
-      Log.trace(F("checkForEvent() before sunset"));
+      Log.trace(F("checkForEvent() before sunset\n"));
 
 #endif
       *prefix = SUNSET_PREFIX;
@@ -606,7 +606,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
 // Finally if we get this far we must be after sunset:
 #ifdef DEBUG
     Serial.println("checkNextEvent() before next day sunrise ");
-    Log.trace(F("checkForEvent() before next day"));
+    Log.trace(F("checkForEvent() before next day\n"));
 
 #endif
     *prefix = SUNRISE_PREFIX;

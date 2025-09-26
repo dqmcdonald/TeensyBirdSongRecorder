@@ -109,7 +109,7 @@ const long int RECORDING_MILLIS = 1000 * 60 * RECORDING_MINUTES;  // Time for ea
 
 // Start 15 minutes before sunrise
 const int SUNRISE_OFFSET = -15;  // Time +/- from sunrise data to begin recording
-const int SUNSET_OFFSET = 15;    // Time +/- from sunset data to begin recording
+const int SUNSET_OFFSET = -15;   // Time +/- from sunset data to begin recording
 
 elapsedMillis etime;
 

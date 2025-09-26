@@ -3,6 +3,8 @@
 
 #define DEBUG 1
 
+static const int MARGIN = 1; // Allow up to 1 minute difference when comparing times.
+
 RecorderTime::RecorderTime(int hour, int minute) {
   d_hour = hour;
   d_minute = minute;
@@ -35,7 +37,7 @@ void RecorderTime::applyOffset(int offset) {
 bool RecorderTime::before(const RecorderTime& target) {
   // Return True if the current time is "before" the current time. In reality we will use up to one minute after the target
   // time
-  static const int MARGIN = 1;
+ 
 
   if (d_hour < target.hour()) {
     return true;  // lower hour, then is before the target
@@ -73,6 +75,10 @@ bool RecorderTime::sleepOrRecord(const RecorderTime& target, int* sleep_hour, in
 
   int minute_diff = target.minute() - d_minute;
 
+  if( fabs(minute_diff) == MARGIN) // If we are within the margin then treat the difference as zero
+    minute_diff = 0;
+
+
   if (minute_diff < 0) {
     minute_diff = minute_diff + 60;
     hour_diff--;
@@ -84,13 +90,16 @@ bool RecorderTime::sleepOrRecord(const RecorderTime& target, int* sleep_hour, in
 #endif
 
   // Check to see if we can record now:
-  if (hour_diff == 0 && minute_diff <= 1) {
+  if (hour_diff == 0 && minute_diff == 0 ) {
     do_record = true;
 #if DEBUG
     Serial.println("      sleepOrRecord(): close to event, recording");
     
 #endif
   } else {
+
+    if( hour_diff < 0 )
+      hour_diff = -hour_diff;
     *sleep_hour = hour_diff;
     *sleep_minute = minute_diff;
     do_record = false;
