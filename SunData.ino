@@ -9,6 +9,7 @@ D. Q. McDonald   August 2025
 
 #include "RecorderTime.h"
 
+#define DAYLIGHT_SAVINGS_TIME 1
 
 
 typedef struct
@@ -21,6 +22,9 @@ typedef struct
   uint8_t sunset_min;    // sunset minute
 
 } Sun_data_s;
+
+
+// Sun data. This is in NZST. Define DAYLIGHT_SAVINGS_TIME if that is in use
 
 Sun_data_s sun_data[] = {
   { 1, 1, 4, 51, 20, 13 },
@@ -435,7 +439,14 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
   // Get current date and time
   int current_month = month();
   int current_day = day();
+#ifdef DAYLIGHT_SAVINGS_TIME
+  int current_hour = hour() - 1;  // If daylight savings time then subtract an hour
+  if (current_hour < 0) {
+    current_hour = 23;
+  }
+#else
   int current_hour = hour();
+#endif
   int current_minute = minute();
 
 
@@ -444,12 +455,21 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
   Serial.println(current_month);
   Serial.print("  checkNextEvent() current day:");
   Serial.println(current_day);
-  Serial.print("  checkNextEvent() current hour:");
+#ifdef DAYLIGHT_SAVINGS_TIME
+  Serial.print("  checkNextEvent() current hour (DST):");
+#else
+  Serial.print("  checkNextEvent() current hour (NZST):");
+#endif
   Serial.println(current_hour);
   Serial.print("  checkNextEvent() current minute:");
   Serial.println(current_minute);
-  Log.trace(F("checkForEvent() month = %d, day = %d, hour = %d, minute=%d\n"), current_month,
+  #ifdef DAYLIGHT_SAVINGS_TIME
+  Log.trace(F("checkForEvent() [DST] month = %d, day = %d, hour = %d, minute=%d\n"), current_month,
             current_day, current_hour, current_minute);
+  #else
+  Log.trace(F("checkForEvent() [NZST] month = %d, day = %d, hour = %d, minute=%d\n"), current_month,
+            current_day, current_hour, current_minute);
+  #endif
 #endif
 
   RecorderTime current_time(current_hour, current_minute);

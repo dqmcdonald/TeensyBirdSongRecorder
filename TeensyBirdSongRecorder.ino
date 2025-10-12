@@ -98,14 +98,13 @@ rec_modes mode = STOPPED;
 File frec;
 File logFile;
 
-const long int DAILY_SUNRISE_OFFSET = 5;                          // Number of minutes less than a full day we will sleep for
 const long int RECORDING_MINUTES = 5;                             // Time for each file in minutes
 const long int RECORDING_MILLIS = 1000 * 60 * RECORDING_MINUTES;  // Time for each file in milliseconds
 
 #define SDCARD_CS_PIN BUILTIN_SDCARD
 #define SDCARD_MOSI_PIN 11  // not actually used
 #define SDCARD_SCK_PIN 13   // not actually used
-
+#define LED_PIN 13
 
 // Start 15 minutes before sunrise
 const int SUNRISE_OFFSET = -15;  // Time +/- from sunrise data to begin recording
@@ -137,6 +136,7 @@ void setup() {
 
   randomSeed(analogRead(0));  // Initialise random seed generator
 
+  pinMode(LED_PIN, OUTPUT);
 
   //EEPROM.write(DAY_REC_FLAG_EEPROM_ADDRESS, 0);                  // Initialize the flag stored in EEPROM.
 
@@ -207,8 +207,9 @@ void setup() {
   alarm.setRtcTimer(0, 1, 0);  // hour, min, sec
 #endif
 
+  flash_led(3, 500, 250);  // Flash LED the number of hours to sleep
 
-  delay(100);
+  delay(1000);
 }
 
 
@@ -252,7 +253,7 @@ void loop() {
       logFile.flush();
       logFile.close();
 #endif
-
+      flash_led(sleep_hour, 150, 450);  // Flash LED the number of hours to sleep
       delay(1000);
       setWakeupCallandSleep(sleep_hour * SEC_PER_HOUR + sleep_minute * SEC_PER_MINUTE);
       doReboot();
@@ -285,7 +286,7 @@ void loop() {
     logFile.flush();
     logFile.close();
 #endif
-
+    flash_led(sleep_hour, 150, 450);  // Flash LED the number of hours to sleep
     delay(1000);
     setWakeupCallandSleep(sleep_hour * SEC_PER_HOUR + sleep_minute * SEC_PER_MINUTE);
     doReboot();
@@ -573,6 +574,9 @@ void setWakeupCallandSleep(uint32_t nsec) {
   Snooze.hibernate(snooze_config);  // return module that woke processor
 }
 
+#endif
+
+
 void secondsToHMS(const uint32_t seconds, uint16_t& h, uint16_t& m, uint16_t& s) {
   uint32_t t = seconds;
 
@@ -584,4 +588,14 @@ void secondsToHMS(const uint32_t seconds, uint16_t& h, uint16_t& m, uint16_t& s)
   t = (t - m) / 60;
   h = t;
 }
-#endif
+
+void flash_led(int num_times, int on_ms, int out_ms) {
+  // Flash the built-in LED num_times
+
+  for (int i = 0; i < num_times; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(on_ms);
+    digitalWrite(LED_PIN, LOW);
+    delay(out_ms);
+  }
+}
