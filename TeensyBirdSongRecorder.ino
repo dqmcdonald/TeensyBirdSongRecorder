@@ -104,7 +104,6 @@ const long int RECORDING_MILLIS = 1000 * 60 * RECORDING_MINUTES;  // Time for ea
 #define SDCARD_CS_PIN BUILTIN_SDCARD
 #define SDCARD_MOSI_PIN 11  // not actually used
 #define SDCARD_SCK_PIN 13   // not actually used
-#define LED_PIN 13
 
 // Start 15 minutes before sunrise
 const int SUNRISE_OFFSET = -15;  // Time +/- from sunrise data to begin recording
@@ -136,8 +135,7 @@ void setup() {
 
   randomSeed(analogRead(0));  // Initialise random seed generator
 
-  pinMode(LED_PIN, OUTPUT);
-
+  
   //EEPROM.write(DAY_REC_FLAG_EEPROM_ADDRESS, 0);                  // Initialize the flag stored in EEPROM.
 
 
@@ -207,8 +205,6 @@ void setup() {
   alarm.setRtcTimer(0, 1, 0);  // hour, min, sec
 #endif
 
-  flash_led(3, 500, 250);  // Flash LED the number of hours to sleep
-
   delay(1000);
 }
 
@@ -253,7 +249,7 @@ void loop() {
       logFile.flush();
       logFile.close();
 #endif
-      flash_led(sleep_hour, 150, 450);  // Flash LED the number of hours to sleep
+      
       delay(1000);
       setWakeupCallandSleep(sleep_hour * SEC_PER_HOUR + sleep_minute * SEC_PER_MINUTE);
       doReboot();
@@ -286,7 +282,7 @@ void loop() {
     logFile.flush();
     logFile.close();
 #endif
-    flash_led(sleep_hour, 150, 450);  // Flash LED the number of hours to sleep
+    
     delay(1000);
     setWakeupCallandSleep(sleep_hour * SEC_PER_HOUR + sleep_minute * SEC_PER_MINUTE);
     doReboot();
@@ -327,6 +323,13 @@ void continueRecording() {
   if (queue1.available() >= 2) {
     byte buffer[512];
     memcpy(buffer, queue1.readBuffer(), 256);
+    // Uncomment following lines to see recording data:
+    // for( int i= 0; i < 25; i++ ){
+    //   Serial.print(buffer[i]);
+    //   Serial.print(" ");
+    // }
+    Serial.println(" ");
+
     queue1.freeBuffer();
     memcpy(buffer + 256, queue1.readBuffer(), 256);
     queue1.freeBuffer();
@@ -589,13 +592,4 @@ void secondsToHMS(const uint32_t seconds, uint16_t& h, uint16_t& m, uint16_t& s)
   h = t;
 }
 
-void flash_led(int num_times, int on_ms, int out_ms) {
-  // Flash the built-in LED num_times
 
-  for (int i = 0; i < num_times; i++) {
-    digitalWrite(LED_PIN, HIGH);
-    delay(on_ms);
-    digitalWrite(LED_PIN, LOW);
-    delay(out_ms);
-  }
-}

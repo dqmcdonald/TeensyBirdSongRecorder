@@ -422,6 +422,11 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
   // If "is_sunrise" is true will calculate sleep period to wake sometime at random between 1.5 hr after sunrise
   // and 1.5 hours before sunset.
 
+// Comment out for recording test - will record immediately.
+  // *prefix = SUNSET_PREFIX;
+  // *sleep_hour = 0;
+  // *sleep_minute = 1;
+  // return true;
 
 #ifdef DEBUG
   Serial.print("checkForEvent(  ");
