@@ -1,23 +1,20 @@
 
 /*
-  A bird song recorder. Record environmental sounds via microphone attached to LineIn of Teensy Audio Shield
-  Files are recorded in 5 minute periods, with a date stamp making up the name of the file.
-  Tested on Teensy 3.6 with Audio shield. MEMS mincrophone with separate lithium battery powersupply.
-  This is based strongly on the recorder example file associated with the Audio Shield Examples
+  Autonomous bird song recorder. Sleeps most of the time, waking three times per day to
+  make 5-minute WAV recordings to SD card:
+    - SUNRISE_OFFSET minutes before sunrise
+    - a random time between MINUTES_AFTER_SUNRISE after sunrise and MINUTES_BEFORE_SUNSET before sunset
+    - SUNSET_OFFSET minutes before sunset
 
-  D. Q. McDonald
-  July 2018
+  Audio input: MEMS microphone via I2S (AudioInputI2S + AudioAmplifier).
+  Targets Teensy 3.6 (Snooze hibernate) and Teensy 4.1 (SNVS power-off).
+  Files are named: <PREFIX>_YYYY_MM_DD_HH_MM.WAV
 
-Updated July 2025 for direct MEMS microphone and not using AudioShield. Also recording at sunrise, and sunset and random hour between
+  D. Q. McDonald  July 2018, updated July 2025
 
-
-Uses the following non-standard libraries:
-
-ArduinoLog: https://github.com/thijse/Arduino-Log
-
-Snooze: https://github.com/duff2013/Snooze
-
-
+  Non-standard libraries:
+    ArduinoLog: https://github.com/thijse/Arduino-Log
+    Snooze:     https://github.com/duff2013/Snooze  (Teensy 3.x only)
 */
 
 #ifndef __IMXRT1062__  // Can't use Snooze library on Teensy 4.1
@@ -41,7 +38,7 @@ Snooze: https://github.com/duff2013/Snooze
 // Uncomment following line for debugging output
 #define DEBUG 1
 
-//Variables used to write Wave file
+// WAV file header fields (written by writeOutHeader() after recording completes)
 unsigned long ChunkSize = 0L;
 unsigned long Subchunk1Size = 16;
 unsigned int AudioFormat = 1;
@@ -62,7 +59,7 @@ String filename;
 const int SEC_PER_HOUR = 60 * 60;
 const int SEC_PER_MINUTE = 60;
 
-const int DAY_REC_FLAG_EEPROM_ADDRESS = 0;  // The address to store day record flag address.
+const int DAY_REC_FLAG_EEPROM_ADDRESS = 0;  // EEPROM address of the daytime-recording flag (survives T4.1 power-off)
 
 
 bool do_record;
@@ -70,21 +67,18 @@ const char* file_prefix = "";
 byte record_during_day = 0;
 
 
-// Definitions of Audio Library objects
-
 AudioPlaySdWav audioSD;
 AudioInputI2S audioInput;
 AudioOutputI2S audioOutput;
 AudioRecordQueue queue1;
 AudioAmplifier amp1;
 
-const float AMP_GAIN = 100.0;
+const float AMP_GAIN = 100.0;  // MEMS mic output is weak; needs high gain
 
-
-
-//record from mic to buffer:
+// Signal path: mic → amplifier → record queue
 AudioConnection patchCord4(audioInput, 0, amp1, 0);
 AudioConnection patchCord1(amp1, 0, queue1, 0);
+// Playback objects wired but unused during recording
 AudioConnection patchCord2(audioSD, 0, audioOutput, 0);
 AudioConnection patchCord3(audioSD, 0, audioOutput, 1);
 
@@ -105,9 +99,8 @@ const long int RECORDING_MILLIS = 1000 * 60 * RECORDING_MINUTES;  // Time for ea
 #define SDCARD_MOSI_PIN 11  // not actually used
 #define SDCARD_SCK_PIN 13   // not actually used
 
-// Start 15 minutes before sunrise
-const int SUNRISE_OFFSET = -15;  // Time +/- from sunrise data to begin recording
-const int SUNSET_OFFSET = -15;   // Time +/- from sunset data to begin recording
+const int SUNRISE_OFFSET = -15;  // minutes relative to sunrise (negative = before)
+const int SUNSET_OFFSET = -15;   // minutes relative to sunset  (negative = before)
 
 elapsedMillis etime;
 
@@ -123,20 +116,18 @@ SnoozeBlock snooze_config(alarm, audio);
 
 
 
-// Times we will sleep for
 int sleep_hour = 0;
 int sleep_minute = 0;
 
-//  Forward declaration of functions
+// checkNextEvent() is defined in SunData.ino; forward-declared here so loop() can call it
 bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int* sleep_minute, const char** prefix,
                     bool is_sunrise);
 
 void setup() {
 
-  randomSeed(analogRead(0));  // Initialise random seed generator
+  randomSeed(analogRead(0));
 
-  
-  //EEPROM.write(DAY_REC_FLAG_EEPROM_ADDRESS, 0);                  // Initialize the flag stored in EEPROM.
+  //EEPROM.write(DAY_REC_FLAG_EEPROM_ADDRESS, 0);  // uncomment once to clear a stuck EEPROM flag
 
 
 
@@ -145,8 +136,7 @@ void setup() {
   Serial.print("\n");
 #endif
 
-  // set the Time library to use Teensy 3.0's RTC to keep time
-  setSyncProvider(getTeensy3Time);
+  setSyncProvider(getTeensy3Time);  // sync TimeLib to the hardware RTC
 #ifdef DEBUG
   delay(100);
   if (timeStatus() != timeSet) {
@@ -162,7 +152,6 @@ void setup() {
   SPI.setMOSI(SDCARD_MOSI_PIN);
   SPI.setSCK(SDCARD_SCK_PIN);
   if (!(SD.begin(SDCARD_CS_PIN))) {
-    // stop here, but print a message repetitively
     while (1) {
 #ifdef DEBUG
       Serial.println("Unable to access the SD card");
@@ -206,18 +195,17 @@ void loop() {
 
 
   if (mode == STOPPED) {
-    record_during_day = EEPROM.read(DAY_REC_FLAG_EEPROM_ADDRESS);  // recover flag from EEPROM
+    record_during_day = EEPROM.read(DAY_REC_FLAG_EEPROM_ADDRESS);  // flag survives T4.1 power-off; check each wake
 
-    if (record_during_day) {                         // We are waking from a sleep to record during the day.
-      EEPROM.write(DAY_REC_FLAG_EEPROM_ADDRESS, 0);  // Unset the flag
-      do_record = true;                              // begin recordings
-      file_prefix = "DA";                            // Set DA(y) prefix
+    if (record_during_day) {  // woke specifically for the random daytime recording
+      EEPROM.write(DAY_REC_FLAG_EEPROM_ADDRESS, 0);
+      do_record = true;
+      file_prefix = "DA";
 #ifdef DEBUG
       Serial.print("Record during day flag set to true - about to record ");
       Log.trace(F("Record during day flag set to true - about to record \n"));
 #endif
     } else {
-      // Check if it's time to start recording:
       do_record = checkNextEvent(SUNRISE_OFFSET, SUNSET_OFFSET, &sleep_hour, &sleep_minute, &file_prefix, false);
     }
 
@@ -230,7 +218,6 @@ void loop() {
       etime = 0;
       mode = RECORDING;
     } else {
-      // Sleep for the time to the next event
 #ifdef DEBUG
       Serial.print("About to sleep for ");
       Serial.print(sleep_hour);
@@ -241,24 +228,22 @@ void loop() {
       logFile.flush();
       logFile.close();
 #endif
-      
-      delay(1000);
+      delay(1000);  // allow log write to complete before power-off
       setWakeupCallandSleep(sleep_hour * SEC_PER_HOUR + sleep_minute * SEC_PER_MINUTE);
       doReboot();
     }
   }
 
   if (mode == RECORDING && (etime > RECORDING_MILLIS)) {
-    // Recording time has finished:
     stopRecording();
     mode = STOPPED;
 
-    // Special handling for if we have been recording for Sunrise.
+    // After sunrise recording, set EEPROM flag so the next wake triggers a daytime recording.
     String filep = String(file_prefix);
     bool is_sunrise = false;
     if (filep == "SR") {
       is_sunrise = true;
-      EEPROM.write(DAY_REC_FLAG_EEPROM_ADDRESS, 1);  // Set the record during day flag
+      EEPROM.write(DAY_REC_FLAG_EEPROM_ADDRESS, 1);
 #ifdef DEBUG
       Serial.println("Completed sunrise recordings, setting day record flag");
 #endif
@@ -288,7 +273,7 @@ void loop() {
 }
 
 void doReboot() {
-  SCB_AIRCR = 0x05FA0004;
+  SCB_AIRCR = 0x05FA0004;  // Cortex-M system reset request; only reached on T3.6 after Snooze.hibernate() returns
 }
 
 void startRecording(const char* prefix) {
@@ -349,7 +334,7 @@ void stopRecording() {
 void writeOutHeader() {  // update WAV header with final filesize/datasize
 
   Subchunk2Size = recByteSaved;
-  ChunkSize = Subchunk2Size + 36;
+  ChunkSize = Subchunk2Size + 36;  // 36 = WAV header size minus the 8-byte RIFF chunk descriptor
   frec.seek(0);
   frec.write("RIFF");
   byte1 = ChunkSize & 0xff;
@@ -419,7 +404,6 @@ void writeOutHeader() {  // update WAV header with final filesize/datasize
 }
 
 void digitalClockDisplay() {
-  // digital clock display of the time
   Serial.print(hour());
   printDigits(minute());
   printDigits(second());
@@ -480,8 +464,6 @@ void printPrefix(Print* _logOutput, int logLevel) {
 }
 
 void printTimestamp(Print* _logOutput) {
-
-  // Time as string
   char timestamp[20];
   sprintf(timestamp, "%04d-%02d-%02d %02d:%02d", year(), month(), day(), hour(), minute());
   _logOutput->print(timestamp);
@@ -490,12 +472,8 @@ void printTimestamp(Print* _logOutput) {
 #if defined(__IMXRT1062__)
 #define SNVS_LPCR_LPTA_EN_MASK (0x2U)  ///< mask to put MCU to hibernate
 
-// see also https://forum.pjrc.com/threads/58484-issue-to-reporogram-T4-0?highlight=hibernate
-/**
-   * @brief Set the Wakeup Call object
-   *
-   * @param nsec number of seconds to sleep
-   */
+// Programs the SNVS hardware alarm to fire nsec seconds from now.
+// Reference: https://forum.pjrc.com/threads/58484-issue-to-reporogram-T4-0?highlight=hibernate
 void setWakeupCall(uint32_t nsec) {
   uint32_t tmp = SNVS_LPCR;  // save control register
 
@@ -508,12 +486,12 @@ void setWakeupCall(uint32_t nsec) {
 
   __disable_irq();
 
-  //get Time:
+  // Read SNVS RTC with double-read to guard against aliasing between the two registers
   uint32_t lsb, msb;
   do {
     msb = SNVS_LPSRTCMR;
     lsb = SNVS_LPSRTCLR;
-  } while ((SNVS_LPSRTCLR != lsb) | (SNVS_LPSRTCMR != msb));
+  } while ((SNVS_LPSRTCLR != lsb) | (SNVS_LPSRTCMR != msb));  // bitwise | avoids short-circuit so both are always checked
   uint32_t secs = (msb << 17) | (lsb >> 15);
 
   //set alarm
@@ -530,20 +508,12 @@ void setWakeupCall(uint32_t nsec) {
   __enable_irq();
 }
 
-/**
-   * @brief Shut down Tessnsy
-   *
-   */
+// Power off the Teensy 4.1; execution never returns from here.
 void powerDown(void) {
   SNVS_LPCR |= (1 << 6);  // turn off power
   while (1) asm("wfi");
 }
 
-/**
-   * @brief Set the Wakeup Call and Sleep object
-   *
-   * @param nsec number of seconds to sleep
-   */
 void setWakeupCallandSleep(uint32_t nsec) {
   setWakeupCall(nsec);
   powerDown();

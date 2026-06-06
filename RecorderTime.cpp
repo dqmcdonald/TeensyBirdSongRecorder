@@ -11,9 +11,7 @@ RecorderTime::RecorderTime(int hour, int minute) {
 }
 
 void RecorderTime::applyOffset(int offset) {
-  // Apply offset in minutes to the current time.
-  // Offset can be posiitve or negative
-
+  // Applies an offset in minutes (positive or negative). Only handles offsets in (-60, +60).
   d_minute = d_minute + offset;
 
   if (d_minute >= 60) {
@@ -35,36 +33,28 @@ void RecorderTime::applyOffset(int offset) {
 
 
 bool RecorderTime::before(const RecorderTime& target) {
-  // Return True if the current time is "before" the current time. In reality we will use up to one minute after the target
-  // time
- 
-
+  // Returns true if this time is before target, including up to MARGIN minutes past target
+  // (grace period so a wake that lands just after the scheduled minute still triggers recording).
   if (d_hour < target.hour()) {
-    return true;  // lower hour, then is before the target
+    return true;
   }
-
   if (d_hour == target.hour()) {
-    // Same hour, check minute
     if (d_minute <= target.minute() + MARGIN) {
       return true;
     }
   }
-  // Otherwise it is not before the target event:
   return false;
 }
 
 bool RecorderTime::sleepOrRecord(const RecorderTime& target, int* sleep_hour, int* sleep_minute) const {
-  // Compare this object against the target time and decide if we need to sleep until that time or begin recording now
-  // if we are already at it
+  // Returns true (record now) if within MARGIN of target; otherwise sets sleep_hour/sleep_minute and returns false.
   bool do_record = false;
 
   int hour_diff = target.hour() - d_hour;
 
 
 
-  // Normally this will only be used for events that are on the same day and before the target time. But
-  // if the hour difference is negative we can assume it's an event the next day so we need to calculate the hour
-  // difference to take consideration of that
+  // Negative hour_diff means target is on the next calendar day (e.g. current=23:00, target=06:00).
   if (hour_diff < 0) {
     hour_diff = 24 - d_hour + target.hour();
   }
@@ -89,17 +79,14 @@ bool RecorderTime::sleepOrRecord(const RecorderTime& target, int* sleep_hour, in
   Serial.println(minute_diff);
 #endif
 
-  // Check to see if we can record now:
   if (hour_diff == 0 && minute_diff == 0 ) {
     do_record = true;
 #if DEBUG
     Serial.println("      sleepOrRecord(): close to event, recording");
-    
 #endif
   } else {
-
-    if( hour_diff < 0 )
-      hour_diff = -hour_diff;
+    if (hour_diff < 0)
+      hour_diff = -hour_diff;  // defensive: shouldn't happen if before() was checked first
     *sleep_hour = hour_diff;
     *sleep_minute = minute_diff;
     do_record = false;

@@ -1,14 +1,9 @@
-// Sunrise, solar noon and sunrise data and calculation of whether recording should start
-// Times are in NZST and each month has 31 days of data as the max possible.
-
-/**
-Class which handles time calculations for knowing how long to sleep before the next recording time.
-
-D. Q. McDonald   August 2025
-*/
+// Sunrise/sunset lookup table (NZST) and recording schedule logic.
+// D. Q. McDonald  August 2025
 
 #include "RecorderTime.h"
 
+// Define DAYLIGHT_SAVINGS_TIME to subtract 1 hr from the RTC when matching against the NZST table.
 //#define DAYLIGHT_SAVINGS_TIME 1
 
 
@@ -403,7 +398,7 @@ Sun_data_s sun_data[] = {
 
 
 
-#define DAYS_PER_MONTH 31  // Every day has
+#define DAYS_PER_MONTH 31  // table uses 31 slots per month for simple index arithmetic; short months have padding entries
 
 const char* SUNRISE_PREFIX = "SR";
 const char* DAY_PREFIX = "DA";
@@ -511,12 +506,10 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
 #endif
 
 
-  // Also next sunrise
+  // Next day's sunrise is needed for the "after sunset, sleep until tomorrow" case.
   int next_idx = idx + 1;
-
-  // If at end of data use the first of the year
   if (next_idx >= int(sizeof(sun_data) / sizeof(Sun_data_s))) {
-    next_idx = 0;
+    next_idx = 0;  // wrap at year boundary
   }
   RecorderTime next_sunrise((int)sun_data[next_idx].sunrise_hour, (int)sun_data[next_idx].sunrise_min);
 #ifdef DEBUG
@@ -535,11 +528,8 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
     Log.trace(F("  checkNextEvent() At sunrise - calculating random sleep time "));
 #endif
 
-    int start = sunrise.in_minutes();
-    int end = sunset.in_minutes();
-    // offset by 90 minutes
-
-    start += MINUTES_AFTER_SUNRISE;
+    int start = sunrise.in_minutes() + MINUTES_AFTER_SUNRISE;   // earliest valid wakeup (mins since midnight)
+    int end   = sunset.in_minutes()  - MINUTES_BEFORE_SUNSET;   // latest  valid wakeup
     end -= MINUTES_BEFORE_SUNSET;
 
 #ifdef DEBUG
@@ -605,8 +595,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
 #endif
 
 
-    // Now start comparing the possible events:
-    // Sunrise
+    // Find the next scheduled event and either record now or return the sleep duration.
     if (current_time.before(sunrise)) {
 #ifdef DEBUG
       Serial.println("checkNextEvent() before sunrise");
@@ -628,7 +617,7 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
       return current_time.sleepOrRecord(sunset, sleep_hour, sleep_minute);
     }
 
-// Finally if we get this far we must be after sunset:
+    // After sunset: sleep until tomorrow's sunrise.
 #ifdef DEBUG
     Serial.println("checkNextEvent() before next day sunrise ");
     Log.trace(F("checkForEvent() before next day\n"));

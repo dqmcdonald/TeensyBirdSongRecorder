@@ -25,9 +25,9 @@ public:
   
   void applyOffset(int offset);
 
-  bool before(const RecorderTime& target);  // returns true if the current time is before the target time
+  bool before(const RecorderTime& target);  // true if this time is before target (or within MARGIN minutes past it)
 
-  bool sleepOrRecord(const RecorderTime& target, int* sleep_hour, int* sleep_minute) const;  // Return true if to record and sleep time otherwise
+  bool sleepOrRecord(const RecorderTime& target, int* sleep_hour, int* sleep_minute) const;  // true = record now; false = sets sleep duration
 
 private:
   int d_hour;
