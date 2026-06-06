@@ -34,4 +34,9 @@ private:
   int d_minute;
 };
 
+// Returns true if the given local date/time falls within New Zealand Daylight Time (NZDT, UTC+13).
+// NZDT runs from the last Sunday of September 02:00 to the first Sunday of April 03:00.
+// dow uses TimeLib convention: 1=Sunday, 2=Monday, ... 7=Saturday.
+bool isNZDT(int month, int day, int dow, int hour);
+
 #endif

@@ -46,6 +46,32 @@ bool RecorderTime::before(const RecorderTime& target) {
   return false;
 }
 
+bool isNZDT(int month, int day, int dow, int hour) {
+  // Clear cases: no need to check exact transition day.
+  if (month >= 5 && month <= 8) return false;   // May–Aug: always NZST
+  if (month <= 3 || month >= 10) return true;   // Oct–Mar: always NZDT
+
+  // Convert TimeLib dow (1=Sun) to 0-indexed (0=Sun).
+  int dow0 = dow - 1;
+
+  if (month == 9) {
+    // NZDT starts at 02:00 on the last Sunday of September.
+    // Find day-of-month of the last Sunday: compute weekday of Sep 30, then step back.
+    int dow30 = (dow0 + (30 - day)) % 7;
+    int last_sun = 30 - dow30;
+    if (day != last_sun) return day > last_sun;
+    return hour >= 2;
+  }
+
+  // month == 4: NZDT ends at 03:00 on the first Sunday of April.
+  // Find day-of-month of the first Sunday: compute weekday of Apr 1, then step forward.
+  int dow1 = ((dow0 - (day - 1)) % 7 + 7) % 7;
+  int first_sun = 1 + (7 - dow1) % 7;
+  if (day != first_sun) return day < first_sun;
+  return hour < 3;
+}
+
+
 bool RecorderTime::sleepOrRecord(const RecorderTime& target, int* sleep_hour, int* sleep_minute) const {
   // Returns true (record now) if within MARGIN of target; otherwise sets sleep_hour/sleep_minute and returns false.
   bool do_record = false;

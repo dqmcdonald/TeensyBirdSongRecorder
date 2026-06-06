@@ -3,10 +3,6 @@
 
 #include "RecorderTime.h"
 
-// Define DAYLIGHT_SAVINGS_TIME to subtract 1 hr from the RTC when matching against the NZST table.
-//#define DAYLIGHT_SAVINGS_TIME 1
-
-
 typedef struct
 {
   uint8_t month;         // month of data
@@ -19,7 +15,7 @@ typedef struct
 } Sun_data_s;
 
 
-// Sun data. This is in NZST. Define DAYLIGHT_SAVINGS_TIME if that is in use
+// Sun data in NZST (UTC+12). isNZDT() is applied at runtime to convert the RTC reading before comparison.
 
 Sun_data_s sun_data[] = {
   { 1, 1, 4, 51, 20, 13 },
@@ -436,40 +432,30 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
 #endif
 
 
-  // Get current date and time
+  // Get current date and time, converting NZDT → NZST so comparisons match the sun table.
   int current_month = month();
   int current_day = day();
-#ifdef DAYLIGHT_SAVINGS_TIME
-  int current_hour = hour() - 1;  // If daylight savings time then subtract an hour
-  if (current_hour < 0) {
-    current_hour = 23;
-  }
-#else
   int current_hour = hour();
-#endif
+  if (isNZDT(current_month, current_day, weekday(), current_hour)) {
+    current_hour -= 1;  // RTC shows NZDT; subtract 1 hr to match NZST sun table
+    if (current_hour < 0) current_hour = 23;
+  }
   int current_minute = minute();
-
 
 #ifdef DEBUG
   Serial.print("  checkNextEvent() current month:");
   Serial.println(current_month);
   Serial.print("  checkNextEvent() current day:");
   Serial.println(current_day);
-#ifdef DAYLIGHT_SAVINGS_TIME
-  Serial.print("  checkNextEvent() current hour (DST):");
-#else
   Serial.print("  checkNextEvent() current hour (NZST):");
-#endif
   Serial.println(current_hour);
   Serial.print("  checkNextEvent() current minute:");
   Serial.println(current_minute);
-  #ifdef DAYLIGHT_SAVINGS_TIME
-  Log.trace(F("checkForEvent() [DST] month = %d, day = %d, hour = %d, minute=%d\n"), current_month,
-            current_day, current_hour, current_minute);
-  #else
-  Log.trace(F("checkForEvent() [NZST] month = %d, day = %d, hour = %d, minute=%d\n"), current_month,
-            current_day, current_hour, current_minute);
-  #endif
+  Serial.print("  checkNextEvent() NZDT active:");
+  Serial.println(isNZDT(current_month, current_day, weekday(), hour()));
+  Log.trace(F("checkForEvent() [%s] month=%d day=%d hour=%d minute=%d\n"),
+            isNZDT(current_month, current_day, weekday(), hour()) ? "NZDT" : "NZST",
+            current_month, current_day, current_hour, current_minute);
 #endif
 
   RecorderTime current_time(current_hour, current_minute);
