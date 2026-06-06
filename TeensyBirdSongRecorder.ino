@@ -154,6 +154,7 @@ void setup() {
   } else {
     Serial.println("RTC has set the system time");
   }
+#endif
 
   AudioMemory(60);
   amp1.gain(AMP_GAIN);
@@ -171,39 +172,30 @@ void setup() {
   }
 
 
-  logFile = SD.open("log.txt", FILE_WRITE);  // Open or create the log file
-
+  logFile = SD.open("log.txt", FILE_WRITE);
   if (logFile) {
-    Log.begin(LOG_LEVEL_VERBOSE, &logFile, true);  // Initialize ArduinoLog with the file
-    //Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);  // Initialize ArduinoLog with the Serial
-
-    Log.setPrefix(printPrefix);  // set prefix similar to NLog
+    Log.begin(LOG_LEVEL_VERBOSE, &logFile, true);
+    Log.setPrefix(printPrefix);
     Log.trace(F("\n\n\n******************************\n"));
-    Log.setPrefix(printPrefix);  // Date and Time timestamp
+    Log.setPrefix(printPrefix);
     Log.trace(F("Logging started to SD card.\n"));
+#ifdef DEBUG
     Serial.println("Logging started to log.txt");
+#endif
   } else {
+#ifdef DEBUG
     Serial.println("Error opening log.txt");
+#endif
   }
 
 #ifdef DEBUG
   Serial.println("SD Card Setup Complete");
   Log.trace(F("SD Card Setup Complete.\n"));
-#endif
-
-
-
-
-
   Serial.println("RTC setup complete, time and date follows");
   digitalClockDisplay();
   Serial.println("Initialization done\n");
+#endif
   Log.trace(F("Initialization done.\n"));
-#endif
-
-#ifndef __IMXRT1062__
-  alarm.setRtcTimer(0, 1, 0);  // hour, min, sec
-#endif
 
   delay(1000);
 }
@@ -267,7 +259,9 @@ void loop() {
     if (filep == "SR") {
       is_sunrise = true;
       EEPROM.write(DAY_REC_FLAG_EEPROM_ADDRESS, 1);  // Set the record during day flag
-      Serial.println("ompleted sunrise recordings, setting day record flag ");
+#ifdef DEBUG
+      Serial.println("Completed sunrise recordings, setting day record flag");
+#endif
       Log.trace(F("Completed sunrise recordings, setting day record flag\n"));
     }
 
@@ -315,6 +309,8 @@ void startRecording(const char* prefix) {
   if (frec) {
     queue1.begin();
     recByteSaved = 0L;
+  } else {
+    Log.error(F("Failed to open file for recording: '%s'\n"), filename.c_str());
   }
 }
 
@@ -323,22 +319,12 @@ void continueRecording() {
   if (queue1.available() >= 2) {
     byte buffer[512];
     memcpy(buffer, queue1.readBuffer(), 256);
-    // Uncomment following lines to see recording data:
-    // for( int i= 0; i < 25; i++ ){
-    //   Serial.print(buffer[i]);
-    //   Serial.print(" ");
-    // }
-    Serial.println(" ");
-
     queue1.freeBuffer();
     memcpy(buffer + 256, queue1.readBuffer(), 256);
     queue1.freeBuffer();
     // write all 512 bytes to the SD card
     frec.write(buffer, 512);
     recByteSaved += 512;
-    //    elapsedMicros usec = 0;
-    //    Serial.print("SD write, us=");
-    //    Serial.println(usec);
   }
 }
 
@@ -425,7 +411,6 @@ void writeOutHeader() {  // update WAV header with final filesize/datasize
   frec.write(byte2);
   frec.write(byte3);
   frec.write(byte4);
-  frec.close();
 #ifdef DEBUG
   Serial.println("header written");
   Serial.print("Subchunk2: ");

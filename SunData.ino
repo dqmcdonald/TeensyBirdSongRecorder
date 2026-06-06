@@ -9,7 +9,7 @@ D. Q. McDonald   August 2025
 
 #include "RecorderTime.h"
 
-#define DAYLIGHT_SAVINGS_TIME 1
+//#define DAYLIGHT_SAVINGS_TIME 1
 
 
 typedef struct
@@ -549,22 +549,22 @@ bool checkNextEvent(int sunrise_offset, int sunset_offset, int* sleep_hour, int*
     Serial.println(end);
     Log.trace(F("checkForEvent() start, end minutes: %d:%d\n"), start, end);
 #endif
-    int day_length = end - start;
-
-    int random_minutes = random(MINUTES_AFTER_SUNRISE, day_length);
+    int current_minutes = current_hour * 60 + current_minute;
+    int random_time = random(start, end + 1);  // absolute time within window (minutes since midnight)
+    int sleep_minutes = random_time - current_minutes;
     uint16_t h, m, s;
 
-    secondsToHMS(random_minutes * SEC_PER_MINUTE, h, m, s);
+    secondsToHMS((uint32_t)sleep_minutes * SEC_PER_MINUTE, h, m, s);
 
 #ifdef DEBUG
-    Serial.print("  checkNextEvent() random_minutes ");
-    Serial.println(random_minutes);
-    Log.trace(F("checkForEvent() random_minutes %d\n"), random_minutes);
+    Serial.print("  checkNextEvent() random_time (mins since midnight) ");
+    Serial.println(random_time);
+    Serial.print("  checkNextEvent() sleep_minutes ");
+    Serial.println(sleep_minutes);
+    Log.trace(F("checkForEvent() random_time=%d sleep_minutes=%d\n"), random_time, sleep_minutes);
 #endif
 
-    secondsToHMS(random_minutes * SEC_PER_MINUTE, h, m, s);  // Convert back to hours and minutes
-
-    *prefix = SUNSET_PREFIX;
+    *prefix = DAY_PREFIX;
     *sleep_hour = h;
     *sleep_minute = m;
     return false;

@@ -3,8 +3,6 @@
 
 #define DEBUG 1
 
-#define DAYLIGHT_SAVINGS_TIME 1
-
 static const int MARGIN = 1; // Allow up to 1 minute difference when comparing times.
 
 RecorderTime::RecorderTime(int hour, int minute) {
@@ -18,7 +16,7 @@ void RecorderTime::applyOffset(int offset) {
 
   d_minute = d_minute + offset;
 
-  if (d_minute > 60) {
+  if (d_minute >= 60) {
     d_minute = d_minute - 60;
     d_hour = d_hour + 1;
     if (d_hour > 23) {
